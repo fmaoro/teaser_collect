@@ -15,8 +15,14 @@ def load_config(config_filename=None):
 
     # first, read the defaults
     if config_filename:
-        config.read(config_filename)
+        print("loading_config for " + config_filename)
+        try:
+            with open(config_filename) as f:
+                config.read_file(f)
+        except Exception as e:
+            print(e)
+
     else:
-        config.readfp(resource_stream('twitter_data_collection.etc', config_filename))
+        config.read_file(resource_stream('twitter_data_collection.etc', config_filename))
 
     return config

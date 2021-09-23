@@ -14,4 +14,4 @@ RUN pip install . --no-deps
 
 RUN mkdir /data /auth
 
-CMD /app/bin/run_with_restart_docker 
+CMD ./bin/run_with_restart_docker

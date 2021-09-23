@@ -228,6 +228,7 @@ def main():
     # log_conf_path = resource_stream('etc', 'logging.conf')
     # log_conf_path = os.path.join('etc', 'logging.conf')
     log_conf_path = os.path.join(os.getcwd(), 'src/main/python/twitter_data_collection', 'etc', 'logging.conf')
+    # log_conf_path = os.path.join(os.getcwd(), 'etc', 'logging.conf')
     print(log_conf_path,    os.path.exists(log_conf_path))
     logging.config.fileConfig(log_conf_path, defaults={'logfilename': args.logfile})
     logger = logging.getLogger(__name__)
@@ -296,7 +297,7 @@ def main():
     stream = Stream(auth, listener)
 
     logger.info("Starting to read Twitter stream...")
-    stream.filter(follow=follow_list)
+    stream.filter(follow=follow_list, is_async=True)
 
 
 if __name__ == '__main__':

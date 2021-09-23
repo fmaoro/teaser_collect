@@ -491,7 +491,8 @@ def check_noisy_headline(row):
 
 
 def sent_tokenize_article(row):
-    article = row['article']
+    # article = row['article']
+    article = row
     para_ascii = list(map(lambda sent: sent.strip(), article.strip().split('\n\n')))
     para_ = [para for para in para_ascii if len(para.strip().split()) > 2]
     para_clean = [para if (para[-1] == '.' or para[-1] == '?' or para[-1] == '!') else para + '.' for para in para_]

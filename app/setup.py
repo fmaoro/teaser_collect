@@ -15,7 +15,7 @@ setup(name='twitter_data_collection',
       packages=['twitter_data_collection', 'twitter_data_collection.etc'],
       install_requires=[
             'tweepy',
-            'newspaper'
+            'newspaper3k'
       ],
       package_data={'twitter_data_collection.etc': ['twitter_auth.conf', 'logging.conf']},
       entry_points={

@@ -7,14 +7,15 @@ import pandas as pd
 from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize
 from sklearn.cluster import KMeans
-from MulticoreTSNE import MulticoreTSNE as TSNE
+# from MulticoreTSNE import MulticoreTSNE as TSNE
+from sklearn.manifold import TSNE
 from gensim.models import doc2vec
 from string import punctuation
 from nltk.stem.snowball import SnowballStemmer
 import re
 from sklearn.feature_extraction.text import TfidfVectorizer
 import argparse
-from .utils import process_articles, get_df_subset, remove_media, \
+from utils import process_articles, get_df_subset, remove_media, \
     check_noisy_headline, sent_tokenize_article, word_tknz_artsentence, process_tweets, process_headlines, collect_leads, \
     tokenize_leads, percentage_match_tokens, percentage_match_window_tokens, get_d2v_corpus, get_relevant_ratio_km, \
     terms_relevance_score_km, nonovlp_tokens, get_pareto_coverage_km_binwise, colname_to_value, get_top_tokens, \
@@ -184,21 +185,22 @@ def plot_scut_article_overlap(df, save_path, file_name_tag):
     data1, data2 = df_abstw['stmovlp_tw_art'], df_abstw['stmovlp_hd_art']
     f, ax = plt.subplots()
     (mu, sigma) = norm.fit(data1)
-    n, bins, patches = ax.hist(data1, 50, normed=True, alpha=0.75)
-    y = mlab.normpdf(bins, mu, sigma)
+    n, bins, patches = ax.hist(data1, 50, density=True, alpha=0.75)
+    y = norm.pdf(bins, mu, sigma)
     l = ax.plot(bins, y, 'r--', linewidth=2)
     ax.grid(True)
     f.savefig(os.path.join(save_path, 'histo_ugram_twart_%s.png'%(file_name_tag)), bbox_inches="tight")
     f, ax = plt.subplots()
     (mu, sigma) = norm.fit(data2)
-    n, bins, patches = ax.hist(data2, 50, normed=True, alpha=0.75)
-    y = mlab.normpdf(bins, mu, sigma)
+    n, bins, patches = ax.hist(data2, 50, density=True, alpha=0.75)
+    y = norm.pdf(bins, mu, sigma)
     l = ax.plot(bins, y, 'r--', linewidth=2)
     ax.grid(True)
     f.savefig(os.path.join(save_path, 'histo_ugram_hdart_%s.png'%(file_name_tag)), bbox_inches="tight")
 
 
-def create_dataset(df_tsr, save_path, file_name_tag, test_size=250, dev_size=250):
+# def create_dataset(df_tsr, save_path, file_name_tag, test_size=250, dev_size=250):
+def create_dataset(df_tsr, save_path, file_name_tag, test_size=100, dev_size=100):
     df_tsr['art_top_tkns'] = df_tsr.apply(lambda x: get_top_tokens(x['tokenized_article'], 5), axis=1)
     df_tsr['twt_top_tkns'] = df_tsr.apply(lambda x: get_top_tokens(x['tokenized_tweet'], 5), axis=1)
     df_tsr_lead = df_tsr[df_tsr.apply(lambda x: len(
@@ -207,7 +209,7 @@ def create_dataset(df_tsr, save_path, file_name_tag, test_size=250, dev_size=250
     df_tsr_lead_hdl['mc_lead'] = df_tsr_lead_hdl.apply(
         lambda x: Counter([a for a in x['all_tokenized_leads'] if len(a.split()) > 5]).most_common(1)[0][0], axis=1)
     df_tsr_leq1 = df_tsr_lead_hdl.groupby('art_top_tkns').filter(lambda x: len(x) == 1).drop_duplicates(
-        {'twt_top_tkns'}).drop_duplicates({'tokenized_headline'}).drop_duplicates({'lead1'})
+        {'twt_top_tkns'}).drop_duplicates({'tokenized_headline'}).drop_duplicates({'lead1'}, keep="first")
     df_wts_c0 = df_tsr_leq1.apply(lambda x: x['kmeans_class'] == 0, axis=1)
     df_wts_c1 = df_tsr_leq1.apply(lambda x: x['kmeans_class'] == 1, axis=1)
     df_wts_c2 = df_tsr_leq1.apply(lambda x: x['kmeans_class'] == 2, axis=1)
@@ -216,24 +218,25 @@ def create_dataset(df_tsr, save_path, file_name_tag, test_size=250, dev_size=250
     df_wts_c5 = df_tsr_leq1.apply(lambda x: x['kmeans_class'] == 5, axis=1)
     df_wts_c6 = df_tsr_leq1.apply(lambda x: x['kmeans_class'] == 6, axis=1)
     df_wts_c7 = df_tsr_leq1.apply(lambda x: x['kmeans_class'] == 7, axis=1)
+    # Replace should be set to False
     df_c0_smp = df_tsr_leq1.sample(
-        n=test_size, weights=df_wts_c0, replace=False) if sum(df_wts_c0)>0 else pd.DataFrame(columns=df_tsr_leq1.columns)
+        n=test_size, weights=df_wts_c0, replace=True) if sum(df_wts_c0)>0 else pd.DataFrame(columns=df_tsr_leq1.columns)
     df_c1_smp = df_tsr_leq1.sample(
-        n=test_size, weights=df_wts_c1, replace=False) if sum(df_wts_c1)>0 else pd.DataFrame(columns=df_tsr_leq1.columns)
+        n=test_size, weights=df_wts_c1, replace=True) if sum(df_wts_c1)>0 else pd.DataFrame(columns=df_tsr_leq1.columns)
     df_c2_smp = df_tsr_leq1.sample(
-        n=test_size, weights=df_wts_c2, replace=False) if sum(df_wts_c2)>0 else pd.DataFrame(columns=df_tsr_leq1.columns)
+        n=test_size, weights=df_wts_c2, replace=True) if sum(df_wts_c2)>0 else pd.DataFrame(columns=df_tsr_leq1.columns)
     df_c3_smp = df_tsr_leq1.sample(
-        n=test_size, weights=df_wts_c3, replace=False) if sum(df_wts_c3)>0 else pd.DataFrame(columns=df_tsr_leq1.columns)
+        n=test_size, weights=df_wts_c3, replace=True) if sum(df_wts_c3)>0 else pd.DataFrame(columns=df_tsr_leq1.columns)
     df_c4_smp = df_tsr_leq1.sample(
-        n=test_size, weights=df_wts_c4, replace=False) if sum(df_wts_c4)>0 else pd.DataFrame(columns=df_tsr_leq1.columns)
+        n=test_size, weights=df_wts_c4, replace=True) if sum(df_wts_c4)>0 else pd.DataFrame(columns=df_tsr_leq1.columns)
     df_c5_smp = df_tsr_leq1.sample(
-        n=test_size, weights=df_wts_c5, replace=False) if sum(df_wts_c5)>0 else pd.DataFrame(columns=df_tsr_leq1.columns)
+        n=test_size, weights=df_wts_c5, replace=True) if sum(df_wts_c5)>0 else pd.DataFrame(columns=df_tsr_leq1.columns)
     df_c6_smp = df_tsr_leq1.sample(
-        n=test_size, weights=df_wts_c6, replace=False) if sum(df_wts_c6)>0 else pd.DataFrame(columns=df_tsr_leq1.columns)
+        n=test_size, weights=df_wts_c6, replace=True) if sum(df_wts_c6)>0 else pd.DataFrame(columns=df_tsr_leq1.columns)
     df_c7_smp = df_tsr_leq1.sample(
-        n=test_size, weights=df_wts_c7, replace=False) if sum(df_wts_c7)>0 else pd.DataFrame(columns=df_tsr_leq1.columns)
+        n=test_size, weights=df_wts_c7, replace=True) if sum(df_wts_c7)>0 else pd.DataFrame(columns=df_tsr_leq1.columns)
     df_tsr_tst = pd.concat([df_c0_smp, df_c1_smp, df_c2_smp, df_c3_smp, df_c4_smp, df_c5_smp, df_c6_smp, df_c7_smp])
-    df_tsr_leq1_remn = pd.concat([df_tsr_leq1, df_tsr_tst]).drop_duplicates({'art_top_tkns'}, keep=False)
+    df_tsr_leq1_remn = pd.concat([df_tsr_leq1, df_tsr_tst]).drop_duplicates({'art_top_tkns'}, keep="first")
     df_wts_c0 = df_tsr_leq1_remn.apply(lambda x: x['kmeans_class'] == 0, axis=1)
     df_wts_c1 = df_tsr_leq1_remn.apply(lambda x: x['kmeans_class'] == 1, axis=1)
     df_wts_c2 = df_tsr_leq1_remn.apply(lambda x: x['kmeans_class'] == 2, axis=1)
@@ -243,21 +246,21 @@ def create_dataset(df_tsr, save_path, file_name_tag, test_size=250, dev_size=250
     df_wts_c6 = df_tsr_leq1_remn.apply(lambda x: x['kmeans_class'] == 6, axis=1)
     df_wts_c7 = df_tsr_leq1_remn.apply(lambda x: x['kmeans_class'] == 7, axis=1)
     df_c0_smp2 = df_tsr_leq1_remn.sample(
-        n=dev_size, weights=df_wts_c0, replace=False) if sum(df_wts_c0)>0 else pd.DataFrame(columns=df_tsr_tst.columns)
+        n=dev_size, weights=df_wts_c0, replace=True) if sum(df_wts_c0)>0 else pd.DataFrame(columns=df_tsr_tst.columns)
     df_c1_smp2 = df_tsr_leq1_remn.sample(
-        n=dev_size, weights=df_wts_c1, replace=False) if sum(df_wts_c1)>0 else pd.DataFrame(columns=df_tsr_tst.columns)
+        n=dev_size, weights=df_wts_c1, replace=True) if sum(df_wts_c1)>0 else pd.DataFrame(columns=df_tsr_tst.columns)
     df_c2_smp2 = df_tsr_leq1_remn.sample(
-        n=dev_size, weights=df_wts_c2, replace=False) if sum(df_wts_c2)>0 else pd.DataFrame(columns=df_tsr_tst.columns)
+        n=dev_size, weights=df_wts_c2, replace=True) if sum(df_wts_c2)>0 else pd.DataFrame(columns=df_tsr_tst.columns)
     df_c3_smp2 = df_tsr_leq1_remn.sample(
-        n=dev_size, weights=df_wts_c3, replace=False) if sum(df_wts_c3)>0 else pd.DataFrame(columns=df_tsr_tst.columns)
+        n=dev_size, weights=df_wts_c3, replace=True) if sum(df_wts_c3)>0 else pd.DataFrame(columns=df_tsr_tst.columns)
     df_c4_smp2 = df_tsr_leq1_remn.sample(
-        n=dev_size, weights=df_wts_c4, replace=False) if sum(df_wts_c4)>0 else pd.DataFrame(columns=df_tsr_tst.columns)
+        n=dev_size, weights=df_wts_c4, replace=True) if sum(df_wts_c4)>0 else pd.DataFrame(columns=df_tsr_tst.columns)
     df_c5_smp2 = df_tsr_leq1_remn.sample(
-        n=dev_size, weights=df_wts_c5, replace=False) if sum(df_wts_c5)>0 else pd.DataFrame(columns=df_tsr_tst.columns)
+        n=dev_size, weights=df_wts_c5, replace=True) if sum(df_wts_c5)>0 else pd.DataFrame(columns=df_tsr_tst.columns)
     df_c6_smp2 = df_tsr_leq1_remn.sample(
-        n=dev_size, weights=df_wts_c6, replace=False) if sum(df_wts_c6)>0 else pd.DataFrame(columns=df_tsr_tst.columns)
+        n=dev_size, weights=df_wts_c6, replace=True) if sum(df_wts_c6)>0 else pd.DataFrame(columns=df_tsr_tst.columns)
     df_c7_smp2 = df_tsr_leq1_remn.sample(
-        n=dev_size, weights=df_wts_c7, replace=False) if sum(df_wts_c7)>0 else pd.DataFrame(columns=df_tsr_tst.columns)
+        n=dev_size, weights=df_wts_c7, replace=True) if sum(df_wts_c7)>0 else pd.DataFrame(columns=df_tsr_tst.columns)
     df_tsr_val = pd.concat([
         df_c0_smp2, df_c1_smp2, df_c2_smp2, df_c3_smp2, df_c4_smp2, df_c5_smp2, df_c6_smp2, df_c7_smp2])
     df_tsr_trn = pd.concat([df_tsr_lead_hdl, df_tsr_val, df_tsr_tst]).drop_duplicates({'tokenized_tweet'}, keep=False)
@@ -328,7 +331,9 @@ def main():
     #region tokenize
     df_tokenize = df_uniq[df_uniq.apply(
         lambda x: len(x['article'].split()) > 99 and len(x['tweet'].split()) > 4, axis=1)]
-    df_tokenize['article_sentences'] = df_tokenize.apply(sent_tokenize_article, axis=1)
+    # df_tokenize['article_sentences'] = df_tokenize.apply(sent_tokenize_article, axis=1)
+    df_tokenize.loc[:, 'article_sentences'] = df_tokenize['article'].map(sent_tokenize_article)
+    # df_tokenize = df_tokenize[:, 'article_sentences'].apply(sent_tokenize_article, axis=1)
     df_tokenize['tokenized_article'] = df_tokenize.apply(word_tknz_artsentence, axis=1)
     df_tokenize['tokenized_tweet'] = df_tokenize.apply(process_tweets, axis=1)
     df_tokenize['tokenized_headline'] = df_tokenize.apply(process_headlines, axis=1)
@@ -340,7 +345,8 @@ def main():
 
     # region preprocessing
     df_tknz = df_tokenize.drop_duplicates('tokenized_tweet')
-    df_org = df_tknz.groupby('username').filter(lambda x: len(x) > 100)
+    # df_org = df_tknz.groupby('username').filter(lambda x: len(x) > 100)
+    df_org = df_tknz.groupby('username').filter(lambda x: len(x) > 5)
     df_tknz_teaser = df_org.drop_duplicates('tokenized_tweet')
     df_tsr_neqhd = df_tknz_teaser[df_tknz_teaser.apply(
         lambda x: x['tokenized_headline'].lower() != x['tokenized_tweet'].lower() and
